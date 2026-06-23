@@ -1,0 +1,25 @@
+#!/bin/sh
+# Create a WAL-mode sqlite database with schema/index/transaction, run aggregate queries, and print SQLITE_OK.
+trap 'sync; poweroff -f' EXIT
+
+DB=/var/lib/app.db
+rm -f "$DB"
+
+sqlite3 "$DB" <<'SQL'
+PRAGMA journal_mode=WAL;
+CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INTEGER);
+CREATE INDEX idx_users_age ON users(age);
+BEGIN;
+INSERT INTO users(name, age) VALUES ('ada',36),('linus',54),('grace',85),('dennis',70);
+COMMIT;
+SQL
+
+over50=$(sqlite3 "$DB" "SELECT count(*) FROM users WHERE age > 50;")
+avg=$(sqlite3 "$DB" "SELECT CAST(avg(age) AS INTEGER) FROM users;")
+oldest=$(sqlite3 "$DB" "SELECT name FROM users ORDER BY age DESC LIMIT 1;")
+
+if [ "$over50" = "3" ] && [ "$oldest" = "grace" ]; then
+    echo "SQLITE_OK (over50=$over50 avg=$avg oldest=$oldest)" > /dev/console
+else
+    echo "SQLITE_FAIL (over50=$over50 avg=$avg oldest=$oldest)" > /dev/console
+fi

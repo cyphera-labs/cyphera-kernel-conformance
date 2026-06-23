@@ -1,0 +1,75 @@
+#!/bin/sh
+# Start redis-server on TCP loopback, drive it with redis-cli over strings/lists/sets/MULTI/TTL/BGSAVE, and print REDIS_OK.
+exec > /dev/console 2>&1
+trap 'sync; poweroff -f' EXIT
+
+echo "== redis workload (TCP loopback) =="
+redis-server --version
+
+DIR=/data
+mkdir -p "$DIR"
+
+redis-server \
+    --bind 127.0.0.1 --port 6379 \
+    --protected-mode no \
+    --dir "$DIR" --dbfilename dump.rdb \
+    --save '' --appendonly no \
+    --logfile '' &
+SRV=$!
+echo "redis-server pid=$SRV"
+
+CLI="redis-cli -h 127.0.0.1 -p 6379"
+
+i=0
+while [ "$($CLI ping 2>/dev/null)" != "PONG" ]; do
+    i=$((i + 1))
+    if [ "$i" -gt 60 ]; then
+        echo "REDIS_FAIL: server never answered PING (TCP loopback connect)"
+        exit 0
+    fi
+    sleep 1
+done
+echo "== server answered PING after ${i}s =="
+
+ok=1
+chk() {
+    if [ "$2" = "$3" ]; then echo "  ok: $1 = $3"; else echo "  FAIL: $1 expected[$2] got[$3]"; ok=0; fi
+}
+
+$CLI set foo bar >/dev/null
+chk "get foo" "bar" "$($CLI get foo)"
+
+$CLI set ctr 0 >/dev/null; $CLI incr ctr >/dev/null; $CLI incr ctr >/dev/null
+chk "incr ctr" "2" "$($CLI get ctr)"
+
+$CLI rpush mylist a b c d e >/dev/null
+chk "llen mylist" "5" "$($CLI llen mylist)"
+chk "lindex mylist 2" "c" "$($CLI lindex mylist 2)"
+
+$CLI sadd myset x y z x >/dev/null
+chk "scard myset" "3" "$($CLI scard myset)"
+
+printf 'MULTI\nSET tx 10\nINCRBY tx 5\nEXEC\n' | $CLI >/dev/null
+chk "tx (10+5)" "15" "$($CLI get tx)"
+
+$CLI expire foo 1000 >/dev/null
+TTL=$($CLI ttl foo)
+[ "${TTL:-0}" -gt 0 ] && echo "  ok: ttl foo = $TTL" || { echo "  FAIL: ttl foo = $TTL"; ok=0; }
+
+echo "dbsize = $($CLI dbsize)"
+
+$CLI bgsave >/dev/null
+j=0
+while [ "$($CLI info persistence 2>/dev/null | tr -d '\r' | sed -n 's/^rdb_bgsave_in_progress://p')" = "1" ]; do
+    j=$((j + 1)); [ "$j" -gt 30 ] && break; sleep 1
+done
+if [ -f "$DIR/dump.rdb" ]; then
+    echo "  ok: BGSAVE wrote $DIR/dump.rdb ($(wc -c < "$DIR/dump.rdb") bytes)"
+else
+    echo "  FAIL: no dump.rdb after BGSAVE"; ok=0
+fi
+
+$CLI shutdown nosave 2>/dev/null
+wait "$SRV" 2>/dev/null
+
+if [ "$ok" = "1" ]; then echo REDIS_OK; else echo "REDIS_FAIL (one or more ops failed)"; fi

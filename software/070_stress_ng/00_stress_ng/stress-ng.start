@@ -1,0 +1,21 @@
+#!/bin/sh
+# Run stress-ng --futex with --verify across CPUs and print STRESS_NG_OK if every stressor exits cleanly.
+exec > /dev/console 2>&1
+echo "== stress-ng start =="
+stress-ng --version 2>/dev/null | head -1
+
+stress-ng \
+    --futex 2 \
+    --timeout 15s \
+    --verify \
+    --metrics-brief \
+    --times
+rc=$?
+echo "stress-ng exit=$rc"
+if [ "$rc" -eq 0 ]; then
+    echo "STRESS_NG_OK"
+else
+    echo "stress-ng reported failure (rc=$rc) — inspect metrics above"
+fi
+echo "== stress-ng done =="
+poweroff -f 2>/dev/null || true

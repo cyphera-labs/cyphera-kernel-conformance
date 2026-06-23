@@ -1,0 +1,16 @@
+#!/bin/sh
+# Run an OCI container with `crun run` and print CRUN_RUN_OK if the in-container marker file appears.
+exec > /dev/console 2>&1
+trap 'sync; poweroff -f' EXIT
+
+echo "== crun OCI run =="
+crun --version
+
+rm -f /opt/test-bundle/rootfs/marker/CRUN_INSIDE_OK
+crun run --bundle /opt/test-bundle cyphera-test
+
+if [ -f /opt/test-bundle/rootfs/marker/CRUN_INSIDE_OK ]; then
+    echo CRUN_RUN_OK
+else
+    echo CRUN_RUN_FAIL
+fi

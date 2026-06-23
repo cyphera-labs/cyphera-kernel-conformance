@@ -1,0 +1,17 @@
+#!/bin/sh
+# initdb a postgres cluster at boot, feed `select 1;` to a `postgres --single` backend, and print PSQL_OK.
+exec > /dev/console 2>&1
+trap 'sync; poweroff -f' EXIT
+echo '== postgres --single smoke =='
+DATA=/var/lib/postgresql/data
+mkdir -p "$DATA" /run/postgresql
+chown -R postgres:postgres /var/lib/postgresql /run/postgresql
+if [ ! -f "$DATA/PG_VERSION" ]; then
+    echo '== initdb =='
+    su -s /bin/sh postgres -c "initdb -D $DATA --auth=trust --username=postgres --encoding=UTF8 --locale=C" \
+        || { echo PSQL_FAIL_INITDB; exit 0; }
+    echo 'fsync = off' >> "$DATA/postgresql.conf"
+fi
+out=$(su -s /bin/sh postgres -c "echo 'select 1;' | postgres --single -D $DATA -F postgres" 2>&1)
+echo "$out"
+if printf '%s' "$out" | grep -q '1'; then echo PSQL_OK; else echo PSQL_FAIL; fi

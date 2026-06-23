@@ -1,0 +1,17 @@
+# Build output (bundles get written into the sibling cyphera-kernel
+# repo's bundles/ directory, not in-tree here).
+bundles/
+*.log
+
+# Per-workload rootfs/ trees — assembled by each workload's
+# build-rootfs.sh from its Dockerfile + init shim. Regenerable;
+# don't check in the ~1 MB busybox-static blob.
+**/rootfs/
+
+# Per-workload .cache/ — fetched upstream tarballs (Alpine
+# minirootfs, etc.). Regenerable but big; faster to keep around
+# locally than re-download every time. Treat like ~/.cache/.
+**/.cache/
+
+# fetched release kernel (scripts/fetch-kernel.sh) — not committed
+vendor/
