@@ -72,6 +72,7 @@ boot_and_check() {
                    -device virtio-blk-device,drive=cdisk)
     fi
 
+    local rc=0
     case "$BOOT_MODE" in
         pvh)
             timeout "$TIMEOUT" qemu-system-x86_64 \
@@ -84,7 +85,7 @@ boot_and_check() {
                 -serial "file:$out" -display none \
                 -device isa-debug-exit,iobase=0xf4,iosize=0x04 \
                 -device virtio-rng-device \
-                >/dev/null 2>&1 || true
+                >/dev/null 2>&1; rc=$?
             ;;
         grub)
             local iso="/tmp/cyphera-${name}-iso.iso"
@@ -97,12 +98,16 @@ boot_and_check() {
                 -no-reboot \
                 -serial "file:$out" -display none \
                 -device virtio-rng-pci \
-                >/dev/null 2>&1 || true
+                >/dev/null 2>&1; rc=$?
             rm -f "$iso"
             ;;
     esac
 
     if grep -q "$marker" "$out"; then
+        if [ "$rc" = 124 ]; then
+            echo "FAIL  ($name : $marker seen but VM HUNG — timed out without powering off)"
+            return 1
+        fi
         echo "PASS  ($name : $marker found)"
         return 0
     fi
