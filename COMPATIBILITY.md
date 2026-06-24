@@ -12,10 +12,7 @@ The kernel a checkout is pinned to lives in [`KERNEL_VERSION`](KERNEL_VERSION);
 |---|---|---|---|
 | 20260623 | v0.0.4 | 23 / 24 | `software/050_redis/00_redis` — kernel panic on TCP socket teardown |
 | 20260623.1 | v0.0.4 | 23 / 24 | redis — socket-teardown panic; tests hardened |
-
-<!-- next release — uncomment + fill AFTER ./scripts/run-all.sh validates v0.0.5; do not pre-fill the result:
-| YYYYMMDD | v0.0.5 | __ / 24 | (none if redis is green; else the workload + one-line cause) |
--->
+| 20260624 | v0.0.5 | 24 / 24 | — (redis socket-teardown fixed) |
 
 ## Known REDs
 
